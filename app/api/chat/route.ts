@@ -12,38 +12,50 @@ async function generateWithGroq(question: string, context: string) {
   }
 
   const host = process.env.GROQ_API_HOST || 'https://api.groq.com/v1';
-  const model = process.env.GROQ_API_MODEL || 'groq-sonic';
-  const endpoint = `${host.replace(/\/$/, '')}/completions`;
+  const model = process.env.GROQ_API_MODEL || 'mixtral-8x7b-32768';
+  const endpoint = `${host.replace(/\/$/, '')}/chat/completions`;
 
-  const prompt = `You are a helpful assistant for a document Q&A system. Use the provided context to answer the user question. If the context is insufficient, say so clearly. Do not invent facts.\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer:`;
+  const prompt = `You are a helpful assistant for a document Q&A system. Use the provided context to answer the user question. If the context is insufficient, say so clearly. Do not invent facts.
+
+Context:
+${context}
+
+Question: ${question}
+
+Answer:`;
+
+  console.log('Calling Groq API at:', endpoint);
+  console.log('Using model:', model);
 
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
-      input: prompt,
-      max_output_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      max_tokens: 512,
       temperature: 0.2,
     }),
   });
 
   if (!response.ok) {
     const body = await response.text();
+    console.error('Groq API error response:', body);
     throw new Error(`Groq API error ${response.status}: ${body}`);
   }
 
   const data = await response.json();
-  const answer = (
-    data.choices?.[0]?.text ||
-    data.output?.[0]?.content?.[0]?.text ||
-    data.output?.[0]?.text ||
-    data.output?.[0]?.content ||
-    data.response?.[0]?.text
-  )?.trim();
+  console.log('Groq API response received');
+  
+  const answer = data.choices?.[0]?.message?.content?.trim();
 
   return answer && answer.length > 0 ? answer : null;
 }
@@ -88,7 +100,7 @@ export async function POST(req: Request) {
     };
 
     if (modelAnswer) {
-      responsePayload.model = process.env.GROQ_API_MODEL || 'groq-sonic';
+      responsePayload.model = process.env.GROQ_API_MODEL || 'mixtral-8x7b-32768';
     }
 
     return NextResponse.json(responsePayload);
