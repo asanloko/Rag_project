@@ -5,36 +5,47 @@ import pdf from 'pdf-parse';
 
 export const runtime = 'nodejs';
 
-type OllamaResponse = {
-  response?: string;
-  done?: boolean;
-  error?: string;
-};
-
-async function generateWithLocalModel(question: string, context: string) {
-  const model = process.env.OLLAMA_MODEL || 'llama2';
-  const host = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
-  const endpoint = `${host.replace(/\/$/, '')}/api/generate`;
-
-  const prompt = `You are a helpful assistant powered by Llama 2. Use the provided context to answer the user question. If the context is insufficient, say so clearly. Do not invent facts.\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer:`;
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, stream: false }),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as OllamaResponse;
-    const answer = data.response?.trim();
-    return answer && answer.length > 0 ? answer : null;
-  } catch {
-    return null;
+async function generateWithGroq(question: string, context: string) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing GROQ_API_KEY in environment');
   }
+
+  const host = process.env.GROQ_API_HOST || 'https://api.groq.com/v1';
+  const model = process.env.GROQ_API_MODEL || 'groq-sonic';
+  const endpoint = `${host.replace(/\/$/, '')}/completions`;
+
+  const prompt = `You are a helpful assistant for a document Q&A system. Use the provided context to answer the user question. If the context is insufficient, say so clearly. Do not invent facts.\n\nContext:\n${context}\n\nQuestion: ${question}\n\nAnswer:`;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      input: prompt,
+      max_output_tokens: 512,
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Groq API error ${response.status}: ${body}`);
+  }
+
+  const data = await response.json();
+  const answer = (
+    data.choices?.[0]?.text ||
+    data.output?.[0]?.content?.[0]?.text ||
+    data.output?.[0]?.text ||
+    data.output?.[0]?.content ||
+    data.response?.[0]?.text
+  )?.trim();
+
+  return answer && answer.length > 0 ? answer : null;
 }
 
 export async function POST(req: Request) {
@@ -64,13 +75,23 @@ export async function POST(req: Request) {
       ? relevant.slice(0, 3).join('\n\n')
       : `I could not find a direct match in the document. Here is a short excerpt:\n\n${chunks[0] || 'No content available.'}`;
 
-    const modelAnswer = await generateWithLocalModel(question, context || chunks.slice(0, 3).join('\n\n'));
+    let modelAnswer: string | null = null;
+    try {
+      modelAnswer = await generateWithGroq(question, context || chunks.slice(0, 3).join('\n\n'));
+    } catch (error) {
+      console.error('Groq API failed:', error);
+    }
 
-    return NextResponse.json({
+    const responsePayload: any = {
       answer: modelAnswer || fallbackAnswer,
-      mode: modelAnswer ? 'local-llama' : 'retrieval',
-      model: process.env.OLLAMA_MODEL || 'llama2',
-    });
+      mode: modelAnswer ? 'groq-api' : 'retrieval',
+    };
+
+    if (modelAnswer) {
+      responsePayload.model = process.env.GROQ_API_MODEL || 'groq-sonic';
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error(error);
     return NextResponse.json({ answer: 'Failed to process the document.' }, { status: 500 });

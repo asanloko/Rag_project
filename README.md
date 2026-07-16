@@ -10,21 +10,21 @@ This is a lightweight chat assistant built with Next.js that answers questions f
 ## Run locally
 1. Install Node.js and npm.
 2. Run `npm install`
-3. Run `npm run dev`
+3. In a new terminal, set the environment variables and run the app:
+   - PowerShell:
+     - `$env:GROQ_API_KEY="your_api_key"`
+     - `$env:GROQ_API_HOST="https://api.groq.com/v1"`
+     - `$env:GROQ_API_MODEL="groq-sonic"`
+     - `npm run dev`
+   - Git Bash:
+     - `export GROQ_API_KEY=your_api_key`
+     - `export GROQ_API_HOST=https://api.groq.com/v1`
+     - `export GROQ_API_MODEL=groq-sonic`
+     - `npm run dev`
 4. Open `http://localhost:3000`
 
-## Enable local Llama 2 reasoning
-This app can use a local Ollama-backed Llama 2 model for better reasoning.
-
-1. Install Ollama from https://ollama.com/
-2. Pull a Llama 2 model locally, for example:
-   - `ollama pull llama2`
-3. Start Ollama.
-4. Set these environment variables before running the app:
-   - `OLLAMA_MODEL=llama2`
-   - `OLLAMA_HOST=http://127.0.0.1:11434`
-
-You can also place model files in the `models/` folder if you want to keep local assets together.
+## Enable Groq API reasoning
+This app now uses a remote Groq API for reasoning. Make sure you set `GROQ_API_KEY` before starting the app.
 
 ## Deploy to Vercel
 1. Push this folder to GitHub.
