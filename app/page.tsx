@@ -34,7 +34,7 @@ export default function HomePage() {
     <main>
       <div className="card">
         <h1>RAG Chat Assistant</h1>
-        <p className="small">Ask questions about the uploaded PDF in this folder.</p>
+        <p className="small">Ask questions about the PDF in this folder. If a local Ollama instance is running with Llama 2, the assistant can use it for deeper reasoning.</p>
         <form onSubmit={handleSubmit}>
           <textarea
             value={question}
